@@ -1,6 +1,6 @@
 import { Stream } from './stream';
-import { Comparator, Peeker, Mapper, Predicate } from './lambdas';
-import { FilterOperator, MapOperator, PeekOperator } from './operators';
+import { Comparator, Peeker, Mapper, Predicate, Reducer } from './lambdas';
+import { FilterOperator, MapOperator, PeekOperator, FlatMapOperator, SkipOperator, LimitOperator, ConcatOperator } from './operators/operators';
 import { Collector, Collectors } from './collectors';
 
 function defaultComparator(a: any, b: any) {
@@ -13,7 +13,7 @@ function defaultComparator(a: any, b: any) {
     return 0;
 }
 
-export class StreamImpl<T> {
+export class StreamImpl<T> implements Stream<T>{
 
     closed: boolean = false;
 
@@ -30,40 +30,12 @@ export class StreamImpl<T> {
         return new StreamImpl(new MapOperator(this.src, mapper));
     }
 
-    flatMap<R>(mapper: (item: T) => Stream<R>): Stream<R> {
+    flatMap<R>(mapper: Mapper<T, Stream<R>>): Stream<R> {
         this.checkClosed();
-        const extractIterator = (i) => i[Symbol.iterator]();
-        let streamOfStreams = this.map(mapper);
-        let itOfStreams = extractIterator(streamOfStreams.toIterable());
-        let currentStream: IteratorResult<Stream<R>>;
-        let flatOp: Iterator<R> = {
-            next: () => {
-                if (!currentStream) {
-                    currentStream = itOfStreams.next();
-                }
-                while (true) {
-                    if (currentStream.done) {
-                        return { done: true, value: undefined };
-                    }
-                    let nextR: IteratorResult<R> = extractIterator(currentStream.value.toIterable()).next();
-                    if (!nextR.done) {
-                        return { done: false, value: nextR.value };
-                    }
-                    if (nextR.done && currentStream.done) {
-                        return nextR;
-                    }
-                    if (nextR.done && !currentStream.done) {
-                        currentStream = itOfStreams.next();
-                    }
-                }
-
-            }
-        };
-        return new StreamImpl(flatOp);
+        return new StreamImpl(new FlatMapOperator(this.src, mapper));
     }
 
-
-    reduce(reducer: (a: T, b: T) => T, identity?: T) {
+    reduce(reducer: Reducer<T>, identity?: T) {
         this.checkClosed(true);
         let elements = this.collect(Collectors.toArray());
         let result = identity;
@@ -90,35 +62,18 @@ export class StreamImpl<T> {
     skip(n: number): Stream<T> {
         this.checkClosed();
         let skipped = 0;
-        return new StreamImpl({
-            next: () => {
-                while (skipped < n) {
-                    this.src.next();
-                    skipped++;
-                }
-                return this.src.next();
-            }
-        });
+        return new StreamImpl(new SkipOperator(this.src, n));
     }
 
     limit(n: number): Stream<T> {
         this.checkClosed();
-        let processed = 0;
-        return new StreamImpl({
-            next: () => {
-                if (processed >= n) {
-                    return { done: true, value: undefined };
-                }
-                processed++;
-                return this.src.next();
-            }
-        });
+        return new StreamImpl(new LimitOperator(this.src, n));
     }
 
     count(): number {
         this.checkClosed(true);
         let i = 0;
-        for (let el of this.toIterable()) {
+        for (let el of this) {
             i++;
         }
         return i;
@@ -126,7 +81,7 @@ export class StreamImpl<T> {
 
     anyMatch(predicate: Predicate<T>) {
         this.checkClosed(true);
-        for (let item of this.toIterable()) {
+        for (let item of this) {
             if (predicate(item)) {
                 return true;
             }
@@ -136,7 +91,7 @@ export class StreamImpl<T> {
 
     allMatch(predicate: Predicate<T>) {
         this.checkClosed(true);
-        for (let item of this.toIterable()) {
+        for (let item of this) {
             if (!predicate(item)) {
                 return false;
             }
@@ -146,7 +101,7 @@ export class StreamImpl<T> {
     }
     noneMatch(predicate: Predicate<T>) {
         this.checkClosed(true);
-        for (let item of this.toIterable()) {
+        for (let item of this) {
             if (predicate(item)) {
                 return false;
             }
@@ -154,16 +109,16 @@ export class StreamImpl<T> {
         return true;
     }
 
-    sort(comparator?: Comparator<T>) {
+    sort(comparator?: Comparator<T>): Stream<T> {
         const elements = this.collect(Collectors.toArray());
         elements.sort(comparator || defaultComparator);
-        return new StreamImpl(elements[Symbol.isConcatSpreadable]);
+        return new StreamImpl(elements[Symbol.iterator]());
     }
 
     min(comparator?: Comparator<T>) {
         comparator = comparator || defaultComparator;
         let min = undefined;
-        for (let item of this.toIterable()) {
+        for (let item of this) {
             if (!min) {
                 min = item;
                 continue;
@@ -178,7 +133,7 @@ export class StreamImpl<T> {
     max(comparator?: Comparator<T>) {
         comparator = comparator || defaultComparator;
         let max = undefined;
-        for (let item of this.toIterable()) {
+        for (let item of this) {
             if (!max) {
                 max = item;
                 continue;
@@ -204,14 +159,18 @@ export class StreamImpl<T> {
 
     forEach(action: (item: T) => void) {
         this.checkClosed(true);
-        for (let item of this.toIterable()) {
+        for (let item of this) {
             action(item);
         }
     }
 
-    collect<R>(collector: Collector<T, R[]>) {
+    collect<R>(collector: Collector<T, R>) {
         this.checkClosed(true);
-        return collector(this.toIterable());
+        return collector(this);
+    }
+
+    concat<T>(other: Stream<T>): Stream<T> {
+        return new StreamImpl(new ConcatOperator(this, other));
     }
 
     checkClosed(set?: boolean) {
@@ -223,10 +182,8 @@ export class StreamImpl<T> {
         }
     }
 
-    toIterable() {
-        return {
-            [Symbol.iterator]: () => this.src
-        };
+    [Symbol.iterator]() {
+        return this.src;
     }
 
 

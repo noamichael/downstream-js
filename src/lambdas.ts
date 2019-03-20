@@ -13,3 +13,7 @@ export interface Mapper<T, R> {
 export interface Peeker<T> {
     (item: T): void
 }
+
+export interface Reducer<T> {
+    (a: T, b: T): T
+}
