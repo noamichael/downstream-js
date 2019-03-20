@@ -1,0 +1,15 @@
+{
+  "name": "downstream-js",
+  "version": "1.0.0",
+  "description": "A Java like stream library",
+  "main": "app/main.ts",
+  "scripts": {
+    "clean": "rm dist",
+    "dev": "tsc --watch"
+  },
+  "author": "Michael Kucinski",
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^3.3.4000"
+  }
+}
