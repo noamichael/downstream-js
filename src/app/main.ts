@@ -1,17 +1,17 @@
-import { Stream } from './stream';
+import { Downstream, Collectors } from './stream';
 
-const result = Stream.of([
+const result = Downstream.of([
     [1, 2, 3, 4, 5],
     [6, 7, 8, 9, 10],
     [11, 12, 13, 14, 15],
     [16, 17, 18, 19, 20]
 ])
-    .flatMap(arr => Stream.of(arr))
+    .flatMap(arr => Downstream.of(arr))
     .limit(5)
     .peek(console.log)
-    .collect(Stream.toArray());
+    .collect(Collectors.toArray());
 
-///console.log(result);
+console.log(result);
 
 // const map = Stream.of(new Map([['one', 'two']]))
 //     .flatMap(Stream.of)
