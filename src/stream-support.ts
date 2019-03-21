@@ -61,7 +61,6 @@ export class StreamImpl<T> implements Stream<T>{
 
     skip(n: number): Stream<T> {
         this.checkClosed();
-        let skipped = 0;
         return new StreamImpl(new SkipOperator(this.src, n));
     }
 
