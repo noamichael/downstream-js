@@ -1,13 +1,13 @@
 import { Operator } from './operator';
-import { Stream } from '../stream';
+import { BaseStream } from '../stream';
 
-export class ConcatOperator<T> implements Operator<T> {
+export class ConcatOperator<T, S extends BaseStream<T, S>> implements Operator<T> {
     private aDone: boolean;
     private bDone: boolean;
 
     constructor(
-        private a: Stream<T>,
-        private b: Stream<T>
+        private a: BaseStream<T, S>,
+        private b: BaseStream<T, S>
     ) { }
 
     next() {

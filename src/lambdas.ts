@@ -6,11 +6,15 @@ export interface Comparator<T> {
     (a: T, b: T): -1 | 0 | 1
 }
 
+export interface Supplier<T> {
+    (): T
+}
+
 export interface Mapper<T, R> {
     (item: T): R
 }
 
-export interface Peeker<T> {
+export interface Consumer<T> {
     (item: T): void
 }
 

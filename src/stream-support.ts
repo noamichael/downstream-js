@@ -1,5 +1,5 @@
-import { Stream } from './stream';
-import { Comparator, Peeker, Mapper, Predicate, Reducer } from './lambdas';
+import { Stream, NumberStream, BaseStream } from './stream';
+import { Comparator, Consumer, Mapper, Predicate, Reducer, Supplier } from './lambdas';
 import { FilterOperator, MapOperator, PeekOperator, FlatMapOperator, SkipOperator, LimitOperator, ConcatOperator } from './operators/operators';
 import { Collector, Collectors } from './collectors';
 
@@ -13,16 +13,23 @@ function defaultComparator(a: any, b: any) {
     return 0;
 }
 
-export class StreamImpl<T> implements Stream<T>{
+interface StreamConstructor<T, S> {
+    new(src: Iterator<T>): S;
+}
+
+abstract class BaseStreamImpl<T, S extends BaseStream<T, S>> implements BaseStream<T, S> {
 
     closed: boolean = false;
 
-    constructor(private src: Iterator<T>) { }
+    constructor(
+        private src: Iterator<T>,
+        private StreamConstructor: StreamConstructor<T, S>
+    ) { }
 
 
-    filter(predicate: Predicate<T>): Stream<T> {
+    filter(predicate: Predicate<T>): S {
         this.checkClosed();
-        return new StreamImpl(new FilterOperator(this.src, predicate));
+        return new this.StreamConstructor(new FilterOperator(this.src, predicate));
     }
 
     map<R>(mapper: Mapper<T, R>): Stream<R> {
@@ -54,20 +61,20 @@ export class StreamImpl<T> implements Stream<T>{
         return next.value;
     }
 
-    peek(op: Peeker<T>): Stream<T> {
+    peek(op: Consumer<T>): S {
         this.checkClosed();
-        return new StreamImpl(new PeekOperator(this.src, op));
+        return new this.StreamConstructor(new PeekOperator(this.src, op));
     }
 
-    skip(n: number): Stream<T> {
+    skip(n: number): S {
         this.checkClosed();
         let skipped = 0;
-        return new StreamImpl(new SkipOperator(this.src, n));
+        return new this.StreamConstructor(new SkipOperator(this.src, n));
     }
 
-    limit(n: number): Stream<T> {
+    limit(n: number): S {
         this.checkClosed();
-        return new StreamImpl(new LimitOperator(this.src, n));
+        return new this.StreamConstructor(new LimitOperator(this.src, n));
     }
 
     count(): number {
@@ -109,10 +116,10 @@ export class StreamImpl<T> implements Stream<T>{
         return true;
     }
 
-    sort(comparator?: Comparator<T>): Stream<T> {
+    sort(comparator?: Comparator<T>): S {
         const elements = this.collect(Collectors.toArray());
         elements.sort(comparator || defaultComparator);
-        return new StreamImpl(elements[Symbol.iterator]());
+        return new this.StreamConstructor(elements[Symbol.iterator]());
     }
 
     min(comparator?: Comparator<T>) {
@@ -169,8 +176,8 @@ export class StreamImpl<T> implements Stream<T>{
         return collector(this);
     }
 
-    concat<T>(other: Stream<T>): Stream<T> {
-        return new StreamImpl(new ConcatOperator(this, other));
+    concat(other: S): S {
+        return new this.StreamConstructor(new ConcatOperator(this, other));
     }
 
     checkClosed(set?: boolean) {
@@ -185,6 +192,67 @@ export class StreamImpl<T> implements Stream<T>{
     [Symbol.iterator]() {
         return this.src;
     }
+}
 
+export class StreamImpl<T> extends BaseStreamImpl<T, Stream<T>> implements Stream<T>{
 
+    constructor(src: Iterator<T>) {
+        super(src, StreamImpl);
+    }
+
+    mapToNumber(mapper: Mapper<T, number>) {
+        return new NumberStreamImpl({
+            next() {
+                const { done, value } = this.src.next();
+                return { done, value: mapper(value) };
+            }
+        });
+    }
+
+}
+
+export class NumberStreamImpl extends BaseStreamImpl<number, NumberStream> implements NumberStream {
+
+    constructor(src: Iterator<number>) {
+        super(src, NumberStreamImpl);
+    }
+
+    sum() {
+        return this.reduce((a, b) => a + b, 0);
+    }
+
+    static range(startInclusive: number, endExclusive: number): NumberStream {
+        let next = startInclusive;
+        return new NumberStreamImpl({
+            next() {
+                if (next >= endExclusive) {
+                    return { done: true, value: undefined };
+                }
+                return { done: false, value: next++ };
+            }
+        });
+    }
+
+    static iterate(seed: number, f: Mapper<number, number>) {
+        let next = seed;
+        let first = true;
+        return new NumberStreamImpl({
+            next() {
+                if (first) {
+                    first = false;
+                } else {
+                    next = f(next);
+                }
+                return { done: false, value: next };
+            }
+        });
+    }
+
+    static generate(generator: Supplier<number>): NumberStream {
+        return new NumberStreamImpl({
+            next() {
+                return { done: false, value: generator() };
+            }
+        });
+    }
 }

@@ -1,10 +1,10 @@
 import { Operator } from './operator';
-import { Peeker } from '../lambdas';
+import { Consumer } from '../lambdas';
 
 export class PeekOperator<T> implements Operator<T> {
     constructor(
         private src: Iterator<T>,
-        private peeker: Peeker<T>
+        private peeker: Consumer<T>
     ) { }
     next() {
         let next = this.src.next();
