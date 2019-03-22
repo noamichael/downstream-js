@@ -68,7 +68,6 @@ abstract class BaseStreamImpl<T, S extends BaseStream<T, S>> implements BaseStre
 
     skip(n: number): S {
         this.checkClosed();
-        let skipped = 0;
         return new this.StreamConstructor(new SkipOperator(this.src, n));
     }
 

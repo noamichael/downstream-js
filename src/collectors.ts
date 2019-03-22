@@ -17,9 +17,21 @@ export class Collectors {
     }
 
     static joining(delimimeter = '', prefix = '', suffix = ''): Collector<string, string> {
-        return (src) => Collectors.toArray()(src)
-            .map(s => `${prefix}${s}${suffix}`)
-            .join(delimimeter);
+        return (src) => {
+            let it = src[Symbol.iterator]();
+            let buffer = '';
+            let result: IteratorResult<string>;
+            
+            do {
+                let hadPrevious = !!result;
+                result = it.next();
+                if (!result.done) {
+                    buffer += `${hadPrevious ? delimimeter : ''}${prefix}${result.value}${suffix}`;
+                }
+            } while (!result.done);
+
+            return buffer;
+        };
     }
 
     static toMap<K, T, R>(keyMapper: Mapper<T, K>, valueMapper?: Mapper<T, R>, mergeFunction?: Reducer<R>): Collector<T, Map<K, R>> {

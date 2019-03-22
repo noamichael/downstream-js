@@ -28,6 +28,9 @@ export class FlatMapOperator<T, R> implements Operator<R> {
             if (!this.streamIteratorResult) {
                 fetchNextItemIterator();
             }
+            if (!this.itemIterator) {//empty stream
+                return { done: true, value: undefined };
+            }
             let nextItem = this.itemIterator.next();
             if (nextItem.done && !this.streamIteratorResult.done) {
                 fetchNextItemIterator();
