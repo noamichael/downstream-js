@@ -1,0 +1,1 @@
+export interface Stage<T> extends Iterator<T> { }

@@ -1,7 +1,7 @@
-import { Operator } from './operator';
+import { Stage } from './stage';
 import { Consumer } from '../lambdas';
 
-export class PeekOperator<T> implements Operator<T> {
+export class PeekStage<T> implements Stage<T> {
     constructor(
         private src: Iterator<T>,
         private peeker: Consumer<T>

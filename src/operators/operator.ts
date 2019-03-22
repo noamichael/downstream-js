@@ -1,1 +1,0 @@
-export interface Operator<T> extends Iterator<T> { }

@@ -1,17 +1,12 @@
 import { Stream, NumberStream, BaseStream } from './stream';
 import { Comparator, Consumer, Mapper, Predicate, Reducer, Supplier } from './lambdas';
-import { FilterOperator, MapOperator, PeekOperator, FlatMapOperator, SkipOperator, LimitOperator, ConcatOperator } from './operators/operators';
+import { FilterStage, MapStage, PeekStage, FlatMapStage, SkipStage, LimitStage, ConcatStage } from './stages/stages';
 import { Collector, Collectors } from './collectors';
+import { Optional } from './util/optional';
+import { defaultComparator } from './util/comparator';
+import { Stage } from './stages/stage';
+import { RangeStage, IterateStage } from './stages/number-stages';
 
-function defaultComparator(a: any, b: any) {
-    if (a > b) {
-        return 1;
-    }
-    if (a < b) {
-        return -1;
-    }
-    return 0;
-}
 
 interface StreamConstructor<T, S> {
     new(src: Iterator<T>): S;
@@ -22,58 +17,64 @@ abstract class BaseStreamImpl<T, S extends BaseStream<T, S>> implements BaseStre
     closed: boolean = false;
 
     constructor(
-        private src: Iterator<T>,
-        private StreamConstructor: StreamConstructor<T, S>
+        protected src: Iterator<T>,
+        protected StreamConstructor: StreamConstructor<T, S>
     ) { }
 
 
     filter(predicate: Predicate<T>): S {
         this.checkClosed();
-        return new this.StreamConstructor(new FilterOperator(this.src, predicate));
+        return new this.StreamConstructor(new FilterStage(this.src, predicate));
     }
 
     map<R>(mapper: Mapper<T, R>): Stream<R> {
         this.checkClosed();
-        return new StreamImpl(new MapOperator(this.src, mapper));
+        return new StreamImpl(new MapStage(this.src, mapper));
     }
 
     flatMap<R>(mapper: Mapper<T, Stream<R>>): Stream<R> {
         this.checkClosed();
-        return new StreamImpl(new FlatMapOperator(this.src, mapper));
+        return new StreamImpl(new FlatMapStage(this.src, mapper));
     }
 
-    reduce(reducer: Reducer<T>, identity?: T) {
+    reduce(reducer: Reducer<T>): Optional<T>;
+    reduce(reducer: Reducer<T>, identity: T): T
+    reduce(reducer: Reducer<T>, identity?: T): T | Optional<T> {
         this.checkClosed(true);
-        let elements = this.collect(Collectors.toArray());
         let result = identity;
-        for (let element of elements) {
+        let count = 0;
+        for (let element of this) {
             result = reducer(result, element);
+            count++;
         }
-        return result;
+        if (count == 0) {
+            return Optional.empty();
+        }
+        return identity ? result : new Optional(result);
     }
 
-    find(predicate: Predicate<T>) {
+    find(predicate: Predicate<T>): Optional<T> {
         this.checkClosed(true);
         let next;
         do {
             next = this.src.next();
         } while (!next.done && !predicate(next.value));
-        return next.value;
+        return new Optional(next.value);
     }
 
     peek(op: Consumer<T>): S {
         this.checkClosed();
-        return new this.StreamConstructor(new PeekOperator(this.src, op));
+        return new this.StreamConstructor(new PeekStage(this.src, op));
     }
 
     skip(n: number): S {
         this.checkClosed();
-        return new this.StreamConstructor(new SkipOperator(this.src, n));
+        return new this.StreamConstructor(new SkipStage(this.src, n));
     }
 
     limit(n: number): S {
         this.checkClosed();
-        return new this.StreamConstructor(new LimitOperator(this.src, n));
+        return new this.StreamConstructor(new LimitStage(this.src, n));
     }
 
     count(): number {
@@ -133,7 +134,7 @@ abstract class BaseStreamImpl<T, S extends BaseStream<T, S>> implements BaseStre
                 min = item;
             }
         }
-        return min;
+        return new Optional(min);
     }
 
     max(comparator?: Comparator<T>) {
@@ -148,7 +149,7 @@ abstract class BaseStreamImpl<T, S extends BaseStream<T, S>> implements BaseStre
                 max = item;
             }
         }
-        return max;
+        return new Optional(max);
     }
 
     distinct() {
@@ -176,7 +177,7 @@ abstract class BaseStreamImpl<T, S extends BaseStream<T, S>> implements BaseStre
     }
 
     concat(other: S): S {
-        return new this.StreamConstructor(new ConcatOperator(this, other));
+        return new this.StreamConstructor(new ConcatStage(this, other));
     }
 
     checkClosed(set?: boolean) {
@@ -193,19 +194,27 @@ abstract class BaseStreamImpl<T, S extends BaseStream<T, S>> implements BaseStre
     }
 }
 
+class ToNumberStream<T> implements Stage<number>{
+
+    constructor(
+        private src: Iterator<T>,
+        private mapper: Mapper<T, number>
+    ) { }
+
+    next() {
+        const { done, value } = this.src.next();
+        return { done, value: this.mapper(value) };
+    }
+}
+
 export class StreamImpl<T> extends BaseStreamImpl<T, Stream<T>> implements Stream<T>{
 
     constructor(src: Iterator<T>) {
         super(src, StreamImpl);
     }
 
-    mapToNumber(mapper: Mapper<T, number>) {
-        return new NumberStreamImpl({
-            next() {
-                const { done, value } = this.src.next();
-                return { done, value: mapper(value) };
-            }
-        });
+    mapToNumber(mapper: Mapper<T, number>): NumberStream {
+        return new NumberStreamImpl(new ToNumberStream(this.src, mapper));
     }
 
 }
@@ -219,32 +228,22 @@ export class NumberStreamImpl extends BaseStreamImpl<number, NumberStream> imple
     sum() {
         return this.reduce((a, b) => a + b, 0);
     }
+    average() {
+        let count = 0;
+        let sum = 0;
+        for (let num of this) {
+            sum += num;
+            count++;
+        }
+        return count == 0 ? Optional.empty() : new Optional(sum / count);
+    }
 
     static range(startInclusive: number, endExclusive: number): NumberStream {
-        let next = startInclusive;
-        return new NumberStreamImpl({
-            next() {
-                if (next >= endExclusive) {
-                    return { done: true, value: undefined };
-                }
-                return { done: false, value: next++ };
-            }
-        });
+        return new NumberStreamImpl(new RangeStage(startInclusive, endExclusive));
     }
 
     static iterate(seed: number, f: Mapper<number, number>) {
-        let next = seed;
-        let first = true;
-        return new NumberStreamImpl({
-            next() {
-                if (first) {
-                    first = false;
-                } else {
-                    next = f(next);
-                }
-                return { done: false, value: next };
-            }
-        });
+        return new NumberStreamImpl(new IterateStage(seed, f));
     }
 
     static generate(generator: Supplier<number>): NumberStream {

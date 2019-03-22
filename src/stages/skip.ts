@@ -1,6 +1,6 @@
-import { Operator } from './operator';
+import { Stage } from './stage';
 
-export class SkipOperator<T> implements Operator<T> {
+export class SkipStage<T> implements Stage<T> {
 
     private skipped = 0
 

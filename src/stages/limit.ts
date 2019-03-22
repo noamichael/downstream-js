@@ -1,4 +1,4 @@
-export class LimitOperator<T> {
+export class LimitStage<T> {
     
     private processed: number = 0;
 

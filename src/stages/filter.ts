@@ -1,7 +1,7 @@
 import { Predicate } from '../lambdas';
-import { Operator } from './operator';
+import { Stage } from './stage';
 
-export class FilterOperator<T> implements Operator<T> {
+export class FilterStage<T> implements Stage<T> {
 
     constructor(
         private src: Iterator<T>,

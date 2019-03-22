@@ -1,7 +1,7 @@
 import { Mapper } from "../lambdas";
-import { Operator } from './operator';
+import { Stage } from './stage';
 
-export class MapOperator<T, R> implements Operator<R> {
+export class MapStage<T, R> implements Stage<R> {
     constructor(
         private src: Iterator<T>,
         private mapper: Mapper<T, R>

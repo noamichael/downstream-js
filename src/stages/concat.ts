@@ -1,7 +1,7 @@
-import { Operator } from './operator';
+import { Stage } from './stage';
 import { BaseStream } from '../stream';
 
-export class ConcatOperator<T, S extends BaseStream<T, S>> implements Operator<T> {
+export class ConcatStage<T, S extends BaseStream<T, S>> implements Stage<T> {
     private aDone: boolean;
     private bDone: boolean;
 

@@ -1,24 +1,24 @@
-import { Operator } from './operator';
+import { Stage } from './stage';
 import { Stream } from '../stream';
-import { MapOperator } from './map';
+import { MapStage } from './map';
 import { Mapper } from '../lambdas';
 
-export class FlatMapOperator<T, R> implements Operator<R> {
+export class FlatMapStage<T, R> implements Stage<R> {
 
     private streamIteratorResult: IteratorResult<Stream<R>>
     private itemIterator: Iterator<R>
-    private mapOperator: MapOperator<T, Stream<R>>
+    private mapStage: MapStage<T, Stream<R>>
 
     constructor(
         src: Iterator<T>,
         mapper: Mapper<T, Stream<R>>
     ) {
-        this.mapOperator = new MapOperator(src, mapper);
+        this.mapStage = new MapStage(src, mapper);
     }
 
     next() {
         const fetchNextItemIterator = () => {
-            this.streamIteratorResult = this.mapOperator.next();
+            this.streamIteratorResult = this.mapStage.next();
             if (!this.streamIteratorResult.done) {
                 this.itemIterator = this.streamIteratorResult.value[Symbol.iterator]();
             }

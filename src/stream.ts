@@ -1,10 +1,11 @@
 import { Comparator, Consumer, Mapper, Predicate, Reducer, Supplier } from './lambdas';
 import { StreamImpl, NumberStreamImpl } from './stream-support';
 import { Collector } from './collectors';
+import { Optional } from './util/optional';
 
 export * from './collectors';
 export * from './lambdas';
-export * from './operators/operators';
+export * from './stages/stage';
 
 
 export interface BaseStream<T, S extends BaseStream<T, S>> extends Iterable<T> {
@@ -17,9 +18,13 @@ export interface BaseStream<T, S extends BaseStream<T, S>> extends Iterable<T> {
 
     flatMap<R>(mapper: Mapper<T, Stream<R>>): Stream<R>
 
-    reduce(reducer: Reducer<T>, identity?: T): T
+    reduce(reducer: Reducer<T>): Optional<T>
+    
+    reduce(reducer: Reducer<T>, identity: T): T
+    
+    reduce(reducer: Reducer<T>, identity: T): T | Optional<T>
 
-    find(predicate: Predicate<T>): T
+    find(predicate: Predicate<T>): Optional<T>
 
     peek(op: Consumer<T>): S
 
@@ -37,9 +42,9 @@ export interface BaseStream<T, S extends BaseStream<T, S>> extends Iterable<T> {
 
     sort(comparator?: Comparator<T>): S
 
-    min(comparator?: Comparator<T>): T
+    min(comparator?: Comparator<T>): Optional<T>
 
-    max(comparator?: Comparator<T>): T
+    max(comparator?: Comparator<T>): Optional<T>
 
     distinct(): S
 
@@ -48,15 +53,21 @@ export interface BaseStream<T, S extends BaseStream<T, S>> extends Iterable<T> {
     collect<R>(collector: Collector<T, R>): R
 
     concat(other: S): S
+
 }
 
 export interface Stream<T> extends BaseStream<T, Stream<T>> {
     
     mapToNumber(mapper: Mapper<T, number>): NumberStream;
+
 }
 
 export interface NumberStream extends BaseStream<number, NumberStream> {
+    
     sum(): number;
+
+    average(): Optional<number>
+
 }
 
 export class Downstream {
