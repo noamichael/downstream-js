@@ -116,7 +116,7 @@ abstract class BaseStreamImpl<T, S extends BaseStream<T, S>> implements BaseStre
         return true;
     }
 
-    sort(comparator?: Comparator<T>): S {
+    sorted(comparator?: Comparator<T>): S {
         const elements = this.collect(Collectors.toArray());
         elements.sort(comparator || defaultComparator);
         return new this.StreamConstructor(elements[Symbol.iterator]());

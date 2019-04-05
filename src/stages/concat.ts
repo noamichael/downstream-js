@@ -5,10 +5,16 @@ export class ConcatStage<T, S extends BaseStream<T, S>> implements Stage<T> {
     private aDone: boolean;
     private bDone: boolean;
 
+    private itA: Iterator<T>
+    private itB: Iterator<T>
+
     constructor(
-        private a: BaseStream<T, S>,
-        private b: BaseStream<T, S>
-    ) { }
+        a: BaseStream<T, S>,
+        b: BaseStream<T, S>
+    ) {
+        this.itA = a[Symbol.iterator]();
+        this.itB = b[Symbol.iterator]();
+    }
 
     next() {
         if (this.bDone) {
@@ -16,11 +22,11 @@ export class ConcatStage<T, S extends BaseStream<T, S>> implements Stage<T> {
         }
         let next: IteratorResult<T>;
         if (!this.aDone) {
-            next = this.a[Symbol.iterator]().next();
+            next = this.itA.next();
             this.aDone = next.done;
         }
         if (this.aDone) {
-            next = this.b[Symbol.iterator]().next();
+            next = this.itB.next();
             this.bDone = next.done;
         }
         return next;
